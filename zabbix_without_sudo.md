@@ -142,3 +142,75 @@ Since you aren't root, you need to modify the configuration file to point to pat
 
 
 **Are you trying to install the full Zabbix Server (which requires a database like MySQL/PostgreSQL) or just the Agent to monitor this specific machine?**
+
+
+
+
+
+## Restarting Zabbix
+
+Because you installed Zabbix **manually in your home directory** (without `sudo`), you cannot use the standard `systemctl restart zabbix-agent` command. Instead, you have to manually stop the existing process and start a new one.
+
+Here is the "no-sudo" way to restart your service:
+
+### 1. Kill the existing process
+First, find the Process ID (PID) of the running agent and kill it.
+
+**The "Clean" way (using the PID file):**
+If you configured a `PidFile` in your config (as we did in the previous steps):
+```bash
+kill $(cat $HOME/zabbix_install/zabbix_agentd.pid)
+```
+
+**The "Force" way (if the PID file is missing):**
+```bash
+pkill -u $(whoami) zabbix_agentd
+```
+
+---
+
+### 2. Verify it has stopped
+Run this to make sure no Zabbix processes are left hanging:
+```bash
+ps aux | grep zabbix_agentd
+```
+If you only see your `grep` command in the output, the agent is successfully stopped.
+
+---
+
+### 3. Start the Agent again
+Now, launch the binary again, pointing it to your custom configuration file. 
+
+**Crucial Note:** Since you rely on a local library (PCRE), you must ensure your `LD_LIBRARY_PATH` is active in this terminal session.
+
+```bash
+export LD_LIBRARY_PATH=$HOME/pcre_install/lib:$LD_LIBRARY_PATH
+$HOME/zabbix_install/sbin/zabbix_agentd -c $HOME/zabbix_install/etc/zabbix_agentd.conf
+```
+
+---
+
+### 4. Confirm it’s back online
+Check the last few lines of your log file to ensure it started without errors (like port conflicts):
+```bash
+tail -n 20 $HOME/zabbix_install/zabbix_agentd.log
+```
+
+
+
+---
+
+### Pro-Tip: Create a "Restart Alias"
+Since typing those long paths is a headache, you can add a shortcut to your `~/.bashrc` file so you can restart it with one word.
+
+1. Run: `nano ~/.bashrc`
+2. Add this line at the bottom:
+   ```bash
+   alias zbx_restart='pkill -u $(whoami) zabbix_agentd && sleep 1 && export LD_LIBRARY_PATH=$HOME/pcre_install/lib:$LD_LIBRARY_PATH && $HOME/zabbix_install/sbin/zabbix_agentd -c $HOME/zabbix_install/etc/zabbix_agentd.conf && echo "Zabbix Agent Restarted"'
+   ```
+3. Run: `source ~/.bashrc`
+
+Now, whenever you change your `UserParameter` for that **CPU Energy tracking**, you can just type **`zbx_restart`**.
+
+**Did the agent start back up successfully, or did you get a "permission denied" error on the PID file?**
+
